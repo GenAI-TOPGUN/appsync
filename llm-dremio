@@ -128,9 +128,11 @@ python client/run.py
 
 
 quick verify
+
+
 python - <<EOF
-from langchain_mcp_adapters.client import StdioMCPClient
-from langchain_mcp_adapters.tools import load_mcp_tools
-print("MCP imports OK")
+from langchain_mcp_adapters.stdio import create_stdio_client, load_mcp_tools
+print("stdio MCP API OK")
 EOF
+
 
