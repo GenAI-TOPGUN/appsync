@@ -16,16 +16,17 @@ def get_llama_llm():
 
 langchain-mcp-adapters>=0.1.7
 # client/mcp_tools.py
-from langchain_mcp_adapters import MCPToolProvider
+from langchain_mcp_adapters.client import StdioMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+
 
 def get_dremio_tools():
-    provider = MCPToolProvider(
-        command=[
-            "dremio-mcp-server",
-            "run"
-        ]
+    client = StdioMCPClient(
+        command=["dremio-mcp-server", "run"]
     )
-    return provider.get_tools()
+    tools = load_mcp_tools(client)
+    return tools
+
 
 
 # client/agent.py
@@ -65,6 +66,7 @@ def build_agent():
 
 
 # client/graph_agent.py
+# client/graph_agent.py
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage
 from typing import TypedDict, List
@@ -80,6 +82,7 @@ class AgentState(TypedDict):
 def build_graph():
     llm = get_llama_llm()
     tools = get_dremio_tools()
+
     llm = llm.bind_tools(tools)
 
     def call_llm(state: AgentState):
@@ -92,6 +95,7 @@ def build_graph():
     graph.add_edge("llm", END)
 
     return graph.compile()
+
 
 
 # client/run.py
@@ -121,3 +125,12 @@ export X_AUTH_GROUPS="finance,analytics"
 
 source .venv/bin/activate
 python client/run.py
+
+
+quick verify
+python - <<EOF
+from langchain_mcp_adapters.client import StdioMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
+print("MCP imports OK")
+EOF
+
