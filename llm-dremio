@@ -1,0 +1,88 @@
+# client/llm.py
+import os
+from langchain_openai import ChatOpenAI
+
+def get_llama_llm():
+    return ChatOpenAI(
+        model=os.environ.get("LLM_MODEL", "llama-3.1-70b"),
+        base_url=os.environ["OPENAI_BASE_URL"],  # Llama gateway
+        api_key=os.environ.get("OPENAI_API_KEY", "dummy"),
+        default_headers={
+            "X-API-Key": os.environ["X_API_KEY"],
+            "X-Auth-Groups": os.environ["X_AUTH_GROUPS"],
+        },
+        temperature=0,
+    )
+
+langchain-mcp-adapters>=0.1.7
+# client/mcp_tools.py
+from langchain_mcp_adapters import MCPToolProvider
+
+def get_dremio_tools():
+    provider = MCPToolProvider(
+        command=[
+            "dremio-mcp-server",
+            "run"
+        ]
+    )
+    return provider.get_tools()
+
+
+# client/agent.py
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain.prompts import ChatPromptTemplate
+
+from llm import get_llama_llm
+from mcp_tools import get_dremio_tools
+
+def build_agent():
+    llm = get_llama_llm()
+    tools = get_dremio_tools()
+
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", 
+         "You are a Dremio data analyst. "
+         "Use tools to discover schemas and generate valid Dremio SQL. "
+         "Never hallucinate tables or columns."),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}")
+    ])
+
+    agent = create_tool_calling_agent(
+        llm=llm,
+        tools=tools,
+        prompt=prompt
+    )
+
+    return AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True
+    )
+
+
+
+# client/run.py
+from agent import build_agent
+
+agent = build_agent()
+
+while True:
+    q = input("\nAsk Dremio> ")
+    if q.lower() in ("exit", "quit"):
+        break
+
+    result = agent.invoke({"input": q})
+    print(result["output"])
+
+
+
+export OPENAI_BASE_URL="https://llama.company.internal/v1"
+export OPENAI_API_KEY="dummy"
+export LLM_MODEL="llama-3.1-70b"
+export X_API_KEY="real-api-key"
+export X_AUTH_GROUPS="finance,analytics"
+
+
+source .venv/bin/activate
+python client/run.py
