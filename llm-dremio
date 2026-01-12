@@ -61,20 +61,55 @@ def build_agent():
     )
 
 
+ 
+
+
+# client/graph_agent.py
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import HumanMessage
+from typing import TypedDict, List
+
+from llm import get_llama_llm
+from mcp_tools import get_dremio_tools
+
+
+class AgentState(TypedDict):
+    messages: List
+
+
+def build_graph():
+    llm = get_llama_llm()
+    tools = get_dremio_tools()
+    llm = llm.bind_tools(tools)
+
+    def call_llm(state: AgentState):
+        response = llm.invoke(state["messages"])
+        return {"messages": state["messages"] + [response]}
+
+    graph = StateGraph(AgentState)
+    graph.add_node("llm", call_llm)
+    graph.set_entry_point("llm")
+    graph.add_edge("llm", END)
+
+    return graph.compile()
+
 
 # client/run.py
-from agent import build_agent
+from langchain_core.messages import HumanMessage
+from graph_agent import build_graph
 
-agent = build_agent()
+app = build_graph()
 
 while True:
     q = input("\nAsk Dremio> ")
     if q.lower() in ("exit", "quit"):
         break
 
-    result = agent.invoke({"input": q})
-    print(result["output"])
+    result = app.invoke({
+        "messages": [HumanMessage(content=q)]
+    })
 
+    print(result["messages"][-1].content)
 
 
 export OPENAI_BASE_URL="https://llama.company.internal/v1"
